@@ -138,8 +138,13 @@ class pJS
 
       retina_detect: false,
 
-      tmp: {}
+      tmp: {},
+      cache: {
+        overLap: [],
+        opacity: []
+      }
     };
+    
 
     /* params settings */
     if(params){
@@ -157,6 +162,10 @@ class pJS
       mode_bubble_size: this.data.interactivity.modes.bubble.size,
       mode_repulse_distance: this.data.interactivity.modes.repulse.distance
     };
+
+    this.line_linked_Color = [];
+    this.line_mouse_particle = [];
+    this.overLapEnabled = true;
 
   /* ---------- pJS - start ------------ */
 
@@ -212,28 +221,40 @@ pJS.prototype.grabParticle = function(p)    // DONE!!
       if(opacity_line > 0)
       {
         /* style */
-        
-        //let color_line = this.data.particles.line_linked.color_rgb_line;
-
         let color_line;
+
         if(!this.data.particles.line_linked.random)
           color_line = this.data.particles.line_linked.color_rgb_line;
         else
         {
-          color_line = {
-            r: Math.floor(Math.random() * 255),
-            g: Math.floor(Math.random() * 255),
-            b: Math.floor(Math.random() * 255)
+          if(!this.line_mouse_particle.find(e => e.particle == p))
+          {
+            color_line = {
+              r: Math.floor(Math.random() * 255),
+              g: Math.floor(Math.random() * 255),
+              b: Math.floor(Math.random() * 255)
+            };
+            
+            this.line_mouse_particle.push({
+              particle: p,
+              color: color_line
+            });
+
+            this.data.canvas.ctx.strokeStyle = `rgba(${color_line.r},${color_line.g},${color_line.b},${opacity_line})`;
+          }
+          else
+          {
+            this.line_mouse_particle.forEach(el => {
+              if(el.particle == p)
+              {
+                this.data.canvas.ctx.strokeStyle = `rgba(${el.color.r},${el.color.g},${el.color.b},${opacity_line})`;
+              }
+            });
           }
         }
 
+        this.data.canvas.ctx.lineWidth = this.data.interactivity.modes.grab.line_linked.width;
 
-
-
-        this.data.canvas.ctx.strokeStyle = `rgba(${color_line.r},${color_line.g},${color_line.b},${opacity_line})`;
-        this.data.canvas.ctx.lineWidth = this.data.particles.line_linked.width;
-        //pJS.canvas.ctx.lineCap = 'round'; /* performance issue */
-        
         /* path */
         this.data.canvas.ctx.beginPath();
         this.data.canvas.ctx.moveTo(p.x, p.y);
@@ -243,7 +264,57 @@ pJS.prototype.grabParticle = function(p)    // DONE!!
       }
     }
   }
-}
+};
+
+pJS.prototype.overLap = function(e)
+{
+  this.data.particles.list.forEach((particle, id) => {
+    if( (particle.x + particle.radius) > this.data.interactivity.mouse.pos_x && 
+        (particle.x - particle.radius) < this.data.interactivity.mouse.pos_x &&
+        (particle.y + particle.radius) > this.data.interactivity.mouse.pos_y &&
+        (particle.y - particle.radius) < this.data.interactivity.mouse.pos_y
+      )
+    {
+      if(!this.data.cache.overLap.find(a => a.particle == particle))
+      {
+        this.data.cache.overLap.push({
+          particle: particle,
+          vx: particle.vx,
+          vy: particle.vy
+        });
+      }
+      
+      particle.vx = 0;
+      particle.vy = 0;
+      
+      this.data.particles.list.forEach(particle2 => {
+        if(particle != particle2)
+          particle2.opacity = 0;
+        if(particle == particle2)
+          particle2.opacity = 1; 
+      });
+    }
+    else
+    {
+      if(this.data.cache.overLap.length > 0)
+      {
+        let temp = this.data.cache.overLap.findIndex(a => a.particle == particle);
+
+        if(temp != -1)
+        {
+          particle.vx = this.data.cache.overLap[temp].vx;
+          particle.vy = this.data.cache.overLap[temp].vy;
+
+          this.data.cache.overLap.splice(temp,1);
+
+          this.data.particles.list.forEach((particle2, id) => {
+            particle2.opacity = this.data.cache.opacity[id];
+          });
+        }
+      }
+    }
+  });
+};
 
 pJS.prototype.eventsListeners = function()    // DONE!!
 {
@@ -254,7 +325,7 @@ pJS.prototype.eventsListeners = function()    // DONE!!
     this.data.interactivity.el = this.data.canvas.el;
   
   /* detect mouse pos - on hover / click event */
-  if( this.data.interactivity.events.onhover.enable || this.data.interactivity.events.onclick.enable)
+  if( this.data.interactivity.events.onhover.enable /* || this.data.interactivity.events.onclick.enable */)
   {
     /*mousemove */
     this.data.interactivity.el.addEventListener('mousemove', function(e){
@@ -281,6 +352,9 @@ pJS.prototype.eventsListeners = function()    // DONE!!
       }
 
       pJSDom[0].data.interactivity.status = 'mousemove';
+
+      if(pJSDom[0].data.particles.shape.overLap)
+        pJSDom[0].overLap(e);
 
     });
 
@@ -501,11 +575,28 @@ pJS.prototype.linkParticles = function(p1, p2)    // DONE!!
     if( opacity_line > 0)
     {        
       /* style */
-      
-      this.data.canvas.ctx.strokeStyle = `rgba(${color_line.r},${color_line.g},${color_line.b},${opacity_line})`;
+      if(this.data.particles.line_linked.random && (!this.line_linked_Color.find(e => e.p1 == p1) && !this.line_linked_Color.find(e => e.p2 == p2)))
+      {
+        this.line_linked_Color.push({
+          p1: p1,
+          p2: p2,
+          color: color_line
+        });
+
+        this.data.canvas.ctx.strokeStyle = `rgba(${color_line.r},${color_line.g},${color_line.b},${opacity_line})`;
+      }
+      else if(this.data.particles.line_linked.random && (this.line_linked_Color.find(e => e.p1 == p1) && this.line_linked_Color.find(e => e.p2 == p2)))
+      {
+        this.line_linked_Color.forEach(el => {
+          if(el.p1 == p1 && el.p2 == p2)
+          {
+            this.data.canvas.ctx.strokeStyle = `rgba(${el.color.r},${el.color.g},${el.color.b},${opacity_line})`;
+          }
+        });
+      }
+
       this.data.canvas.ctx.lineWidth = this.data.particles.line_linked.width;
-      //pJS.canvas.ctx.lineCap = 'round'; /* performance issue */
-      
+
       /* path */
       this.data.canvas.ctx.beginPath();
       this.data.canvas.ctx.moveTo(p1.x, p1.y);
@@ -738,8 +829,8 @@ pJS.prototype.repulseParticle = function(p)   // DONE!!
     let dist_mouse = Math.sqrt((dx_mouse ** 2) + (dy_mouse ** 2));
 
     let normVec = {
-      x: dx_mouse/dist_mouse, 
-      y: dy_mouse/dist_mouse
+      x: dx_mouse / dist_mouse, 
+      y: dy_mouse / dist_mouse
     };
     let repulseRadius = this.data.interactivity.modes.repulse.distance;
     let velocity = 100;
@@ -1045,14 +1136,11 @@ pJS.prototype.particlesUpdate = function()      // DONE!!
     switch(this.data.particles.move.out_mode)
     {
       case 'bounce':
-        if (particle.x + particle.radius > this.data.canvas.w) 
-          particle.vx = -particle.vx;
-        else if (particle.x - particle.radius < 0) 
-          particle.vx = -particle.vx;
-        if (particle.y + particle.radius > this.data.canvas.h) 
-          particle.vy = -particle.vy;
-        else if (particle.y - particle.radius < 0) 
-          particle.vy = -particle.vy;
+        if ((particle.x + particle.radius > this.data.canvas.w) || (particle.x - particle.radius < 0)) 
+          particle.vx *= -1;
+        
+        if ((particle.y + particle.radius > this.data.canvas.h) || (particle.y - particle.radius < 0)) 
+          particle.vy *= -1;
       break;
     }
 
@@ -1077,21 +1165,24 @@ pJS.prototype.particlesUpdate = function()      // DONE!!
     {
       this.data.particles.list.forEach( particle2 => {
          /* link particles */
-        if(this.data.particles.line_linked.enable)
+        if(particle != particle2)
         {
-          this.linkParticles(particle,particle2);
-        }
+          if(this.data.particles.line_linked.enable)
+          {
+            this.linkParticles(particle,particle2);
+          }
 
-        /* attract particles */
-        if(this.data.particles.move.attract.enable)
-        {
-          this.attractParticles(particle,particle2);
-        }
+          /* attract particles */
+          if(this.data.particles.move.attract.enable)
+          {
+            this.attractParticles(particle,particle2);
+          }
 
-        /* bounce particles */
-        if(this.data.particles.move.bounce)
-        {
-          this.bounceParticles(particle,particle2);
+          /* bounce particles */
+          if(this.data.particles.move.bounce)
+          {
+            this.bounceParticles(particle,particle2);
+          }
         }
       });
     }
@@ -1223,6 +1314,10 @@ class Particle
         this.vo = this.vo * Math.random();
       }
     }
+
+    // into the cache
+    this.parent.data.cache.opacity.push(this.opacity);
+  
 
     /* animation - velocity for speed */
     this.move(this.parent.data.particles.move);
