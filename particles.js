@@ -1,3 +1,38 @@
+function linesColorsRandom()
+{
+  pJSDom[0].data.particles.line_linked.random = !pJSDom[0].data.particles.line_linked.random;
+  pJS.particlesUpdate(pJSDom[0]);
+}
+
+function linesEnable()
+{
+  pJSDom[0].data.particles.line_linked.enable = !pJSDom[0].data.particles.line_linked.enable;
+  pJS.particlesUpdate(pJSDom[0]);
+}
+
+function linesDistance()
+{
+  pJSDom[0].data.particles.line_linked.distance = Number(document.getElementById('lineDistance').value);
+  pJS.particlesUpdate(pJSDom[0]);
+}
+
+function linesOpacity()
+{
+  pJSDom[0].data.particles.line_linked.opacity = Number(document.getElementById('lineOpacity').value);
+  pJS.particlesUpdate(pJSDom[0]);
+}
+
+function linesWidth()
+{
+  pJSDom[0].data.particles.line_linked.width = Number(document.getElementById('lineWidth').value);
+  pJS.particlesUpdate(pJSDom[0]);
+}
+
+function linesColor()
+{
+
+}
+
 class pJS
 {
   constructor(tag_id, params)
@@ -175,6 +210,160 @@ class pJS
     this.eventsListeners();
     this.start();
   }
+
+  static particlesUpdate(obj)      // DONE!!
+{
+  obj.data.particles.list.forEach( particle => {
+    /* move the particle */
+    if(obj.data.particles.move.enable)
+    {
+      let ms = obj.data.particles.move.speed / 2;
+      particle.x += particle.vx * ms;
+      particle.y += particle.vy * ms;
+    }
+
+    /* change opacity status */
+    if(obj.data.particles.opacity.anim.enable)
+    {
+      if(particle.opacity_status == true)
+      {
+        if(particle.opacity >= obj.data.particles.opacity.value) 
+          particle.opacity_status = false;
+        
+        particle.opacity += particle.vo;
+      }
+      else
+      {
+        if( particle.opacity <= obj.data.particles.opacity.anim.opacity_min)
+          particle.opacity_status = true;
+        
+          particle.opacity -= particle.vo;
+      }
+
+      if(particle.opacity < 0) 
+        particle.opacity = 0;
+    }
+
+    /* change size */
+    if(obj.data.particles.size.anim.enable)
+    {
+      if(particle.size_status == true)
+      {
+        if(particle.radius >= obj.data.particles.size.value) 
+          particle.size_status = false;
+        
+        particle.radius += particle.vs;
+      }
+      else
+      {
+        if(particle.radius <= obj.data.particles.size.anim.size_min)
+          particle.size_status = true;
+        
+        particle.radius -= particle.vs;
+      }
+      if(particle.radius < 0)
+        particle.radius = 0;
+    }
+
+    /* change particle position if it is out of canvas */
+    let new_pos;
+    if(obj.data.particles.move.out_mode == 'bounce')
+    {
+      new_pos = {
+        x_left: particle.radius,
+        x_right:  obj.data.canvas.w,
+        y_top: particle.radius,
+        y_bottom: obj.data.canvas.h
+      }
+    }
+    else
+    {
+      new_pos = {
+        x_left: -particle.radius,
+        x_right: obj.data.canvas.w + particle.radius,
+        y_top: -particle.radius,
+        y_bottom: obj.data.canvas.h + particle.radius
+      }
+    }
+
+    if(particle.x - particle.radius > obj.data.canvas.w)
+    {
+      particle.x = new_pos.x_left;
+      particle.y = Math.random() * obj.data.canvas.h;
+    }
+    else if(particle.x + particle.radius < 0)
+    {
+      particle.x = new_pos.x_right;
+      particle.y = Math.random() * obj.data.canvas.h;
+    }
+
+    if(particle.y - particle.radius > obj.data.canvas.h)
+    {
+      particle.y = new_pos.y_top;
+      particle.x = Math.random() * obj.data.canvas.w;
+    }
+    else if(particle.y + particle.radius < 0)
+    {
+      particle.y = new_pos.y_bottom;
+      particle.x = Math.random() * obj.data.canvas.w;
+    }
+
+    /* out of canvas modes */
+    switch(obj.data.particles.move.out_mode)
+    {
+      case 'bounce':
+        if ((particle.x + particle.radius > obj.data.canvas.w) || (particle.x - particle.radius < 0)) 
+          particle.vx *= -1;
+        
+        if ((particle.y + particle.radius > obj.data.canvas.h) || (particle.y - particle.radius < 0)) 
+          particle.vy *= -1;
+      break;
+    }
+
+    /* events */
+    if(isInArray('grab', obj.data.interactivity.events.onhover.mode))
+    {
+      obj.grabParticle(particle);
+    }
+
+    if(isInArray('bubble', obj.data.interactivity.events.onhover.mode) || isInArray('bubble', obj.data.interactivity.events.onclick.mode))
+    {
+      obj.bubbleParticle(particle);
+    }
+
+    if(isInArray('repulse', obj.data.interactivity.events.onhover.mode) || isInArray('repulse', obj.data.interactivity.events.onclick.mode))
+    {
+      obj.repulseParticle(particle);
+    }
+
+    /* interaction auto between particles */
+    if(obj.data.particles.line_linked.enable || obj.data.particles.move.attract.enable)
+    {
+      obj.data.particles.list.forEach( particle2 => {
+         /* link particles */
+        if(particle != particle2)
+        {
+          if(obj.data.particles.line_linked.enable)
+          {
+            obj.linkParticles(particle,particle2);
+          }
+
+          /* attract particles */
+          if(obj.data.particles.move.attract.enable)
+          {
+            obj.attractParticles(particle,particle2);
+          }
+
+          /* bounce particles */
+          if(obj.data.particles.move.bounce)
+          {
+            obj.bounceParticles(particle,particle2);
+          }
+        }
+      });
+    }
+  });
+}
 }
 
 pJS.prototype.init = function()     // DONE!!
@@ -227,31 +416,15 @@ pJS.prototype.grabParticle = function(p)    // DONE!!
           color_line = this.data.particles.line_linked.color_rgb_line;
         else
         {
-          if(!this.line_mouse_particle.find(e => e.particle == p))
-          {
-            color_line = {
-              r: Math.floor(Math.random() * 255),
-              g: Math.floor(Math.random() * 255),
-              b: Math.floor(Math.random() * 255)
-            };
-            
-            this.line_mouse_particle.push({
-              particle: p,
-              color: color_line
-            });
-
-            this.data.canvas.ctx.strokeStyle = `rgba(${color_line.r},${color_line.g},${color_line.b},${opacity_line})`;
-          }
-          else
-          {
-            this.line_mouse_particle.forEach(el => {
-              if(el.particle == p)
-              {
-                this.data.canvas.ctx.strokeStyle = `rgba(${el.color.r},${el.color.g},${el.color.b},${opacity_line})`;
-              }
-            });
-          }
+          this.line_linked_Color.forEach(el1 => {
+            if(el1.p1.id == p.id)
+            {
+              color_line = el1.mouse_color;
+            }
+          });
         }
+
+        this.data.canvas.ctx.strokeStyle = `rgba(${color_line.r},${color_line.g},${color_line.b},${opacity_line})`;
 
         this.data.canvas.ctx.lineWidth = this.data.interactivity.modes.grab.line_linked.width;
 
@@ -373,12 +546,13 @@ pJS.prototype.eventsListeners = function()    // DONE!!
       pJSDom[0].data.interactivity.mouse.click_pos_x = pJSDom[0].data.interactivity.mouse.pos_x;
       pJSDom[0].data.interactivity.mouse.click_pos_y = pJSDom[0].data.interactivity.mouse.pos_y;
       pJSDom[0].data.interactivity.mouse.click_time = new Date().getTime();
-
+      
       if(pJSDom[0].data.interactivity.events.onclick.enable)
       {
         switch(pJSDom[0].data.interactivity.events.onclick.mode)
         {
           case 'push':
+          
             if(pJSDom[0].data.particles.move.enable)
             {
               pJSDom[0].pushParticles(pJSDom[0].data.interactivity.modes.push.particles_nb);
@@ -391,6 +565,84 @@ pJS.prototype.eventsListeners = function()    // DONE!!
               else if(pJSDom[0].data.interactivity.modes.push.particles_nb > 1){
                 pJSDom[0].pushParticles(pJSDom[0].data.interactivity.modes.push.particles_nb);
               }
+            }
+            
+
+            pJSDom[0].line_linked_Color = pJSDom[0].data.particles.list.map((el1,id) => {
+              return {
+                p1: el1,
+                links: pJSDom[0].data.particles.list.map(el2 => {
+
+                  if(el2 != el1)
+                    return {
+                      p2: el2,
+                      color: id == 0 ? {r: Math.floor(Math.random()*255),g: Math.floor(Math.random()*255),b: Math.floor(Math.random()*255)} : ''
+                    }
+                  else
+                    return undefined;
+                }).filter(el => el != undefined)
+              }
+            });
+
+            fillColor(pJSDom[0].line_linked_Color,0);
+            
+            function fillColor(arr,id)
+            {
+              arr.forEach((el1,id2) => {
+                if(id2 == id)
+                {
+                  el1.links.forEach(a => {
+                    if(a.color == '')
+                    {
+                      a.color = {
+                        r: Math.floor(Math.random()*255),
+                        g: Math.floor(Math.random()*255),
+                        b: Math.floor(Math.random()*255)
+                      }
+                    }
+                  });
+
+                  el1.mouse_color = {
+                    r: Math.floor(Math.random()*255),
+                    g: Math.floor(Math.random()*255),
+                    b: Math.floor(Math.random()*255)
+                  }
+                }
+              });
+
+              linkColor()
+
+              if(pJSDom[0].line_linked_Color.length > id)
+                fillColor(arr,id+1)
+            }
+             
+            function linkColor()
+            {
+              pJSDom[0].line_linked_Color.forEach((el1, id) => {
+                if(id > 0)
+                {
+                  let temp = pJSDom[0].line_linked_Color.filter((t,id2) => id2 != id)
+                  
+                  temp.forEach(a => {
+                    a.links.forEach(b => {
+
+                      if(b.p2.id == el1.p1.id)
+                      {
+                        if(b.color != '')
+                        {
+                          el1.links.forEach(cc => {
+                            if(cc.p2.id == a.p1.id)
+                            {
+                              cc.color = {};
+                              Object.deepExtend(cc.color,b.color);
+                            }
+                          });
+                        }
+                      }
+                    });
+                  });
+                }
+              });
             }
             break;
 
@@ -556,11 +808,23 @@ pJS.prototype.linkParticles = function(p1, p2)    // DONE!!
     color_line = this.data.particles.line_linked.color_rgb_line;
   else
   {
-    color_line = {
-      r: Math.floor(Math.random() * 255),
-      g: Math.floor(Math.random() * 255),
-      b: Math.floor(Math.random() * 255)
-    }
+    this.line_linked_Color.forEach(el1 =>{
+      if(el1.p1.id == p1.id)
+      {
+        el1.links.forEach(el2 => {
+          if(el2.p2.id == p2.id)
+          {
+            color_line = {
+              r: el2.color.r,
+              g: el2.color.g,
+              b: el2.color.b
+            }
+          }
+        });
+      }
+    });
+    
+    
   }
 
   let dx = p1.x - p2.x;
@@ -574,26 +838,10 @@ pJS.prototype.linkParticles = function(p1, p2)    // DONE!!
 
     if( opacity_line > 0)
     {        
-      /* style */
-      if(this.data.particles.line_linked.random && (!this.line_linked_Color.find(e => e.p1 == p1) && !this.line_linked_Color.find(e => e.p2 == p2)))
-      {
-        this.line_linked_Color.push({
-          p1: p1,
-          p2: p2,
-          color: color_line
-        });
 
-        this.data.canvas.ctx.strokeStyle = `rgba(${color_line.r},${color_line.g},${color_line.b},${opacity_line})`;
-      }
-      else if(this.data.particles.line_linked.random && (this.line_linked_Color.find(e => e.p1 == p1) && this.line_linked_Color.find(e => e.p2 == p2)))
-      {
-        this.line_linked_Color.forEach(el => {
-          if(el.p1 == p1 && el.p2 == p2)
-          {
-            this.data.canvas.ctx.strokeStyle = `rgba(${el.color.r},${el.color.g},${el.color.b},${opacity_line})`;
-          }
-        });
-      }
+      /* style */
+      this.data.canvas.ctx.strokeStyle = `rgba(${color_line.r},${color_line.g},${color_line.b},${opacity_line})`;
+
 
       this.data.canvas.ctx.lineWidth = this.data.particles.line_linked.width;
 
@@ -929,7 +1177,7 @@ pJS.prototype.particlesDraw = function()      // DONE!!
   this.data.canvas.ctx.clearRect(0, 0, this.data.canvas.w, this.data.canvas.h);
 
   /* update each particles param */
-  this.particlesUpdate();
+  pJS.particlesUpdate(this);
 
   /* draw each particle */
   this.data.particles.list.forEach( particle => {
@@ -1035,159 +1283,7 @@ pJS.prototype.canvasClear = function()    // DONE!!
   this.data.canvas.ctx.clearRect(0, 0, this.data.canvas.w, this.data.canvas.h);
 }
 
-pJS.prototype.particlesUpdate = function()      // DONE!!
-{
-  this.data.particles.list.forEach( particle => {
-    /* move the particle */
-    if(this.data.particles.move.enable)
-    {
-      let ms = this.data.particles.move.speed / 2;
-      particle.x += particle.vx * ms;
-      particle.y += particle.vy * ms;
-    }
 
-    /* change opacity status */
-    if(this.data.particles.opacity.anim.enable)
-    {
-      if(particle.opacity_status == true)
-      {
-        if(particle.opacity >= this.data.particles.opacity.value) 
-          particle.opacity_status = false;
-        
-        particle.opacity += particle.vo;
-      }
-      else
-      {
-        if( particle.opacity <= this.data.particles.opacity.anim.opacity_min)
-          particle.opacity_status = true;
-        
-          particle.opacity -= particle.vo;
-      }
-
-      if(particle.opacity < 0) 
-        particle.opacity = 0;
-    }
-
-    /* change size */
-    if(this.data.particles.size.anim.enable)
-    {
-      if(particle.size_status == true)
-      {
-        if(particle.radius >= this.data.particles.size.value) 
-          particle.size_status = false;
-        
-        particle.radius += particle.vs;
-      }
-      else
-      {
-        if(particle.radius <= this.data.particles.size.anim.size_min)
-          particle.size_status = true;
-        
-        particle.radius -= particle.vs;
-      }
-      if(particle.radius < 0)
-        particle.radius = 0;
-    }
-
-    /* change particle position if it is out of canvas */
-    let new_pos;
-    if(this.data.particles.move.out_mode == 'bounce')
-    {
-      new_pos = {
-        x_left: particle.radius,
-        x_right:  this.data.canvas.w,
-        y_top: particle.radius,
-        y_bottom: this.data.canvas.h
-      }
-    }
-    else
-    {
-      new_pos = {
-        x_left: -particle.radius,
-        x_right: this.data.canvas.w + particle.radius,
-        y_top: -particle.radius,
-        y_bottom: this.data.canvas.h + particle.radius
-      }
-    }
-
-    if(particle.x - particle.radius > this.data.canvas.w)
-    {
-      particle.x = new_pos.x_left;
-      particle.y = Math.random() * this.data.canvas.h;
-    }
-    else if(particle.x + particle.radius < 0)
-    {
-      particle.x = new_pos.x_right;
-      particle.y = Math.random() * this.data.canvas.h;
-    }
-
-    if(particle.y - particle.radius > this.data.canvas.h)
-    {
-      particle.y = new_pos.y_top;
-      particle.x = Math.random() * this.data.canvas.w;
-    }
-    else if(particle.y + particle.radius < 0)
-    {
-      particle.y = new_pos.y_bottom;
-      particle.x = Math.random() * this.data.canvas.w;
-    }
-
-    /* out of canvas modes */
-    switch(this.data.particles.move.out_mode)
-    {
-      case 'bounce':
-        if ((particle.x + particle.radius > this.data.canvas.w) || (particle.x - particle.radius < 0)) 
-          particle.vx *= -1;
-        
-        if ((particle.y + particle.radius > this.data.canvas.h) || (particle.y - particle.radius < 0)) 
-          particle.vy *= -1;
-      break;
-    }
-
-    /* events */
-    if(isInArray('grab', this.data.interactivity.events.onhover.mode))
-    {
-      this.grabParticle(particle);
-    }
-
-    if(isInArray('bubble', this.data.interactivity.events.onhover.mode) || isInArray('bubble', this.data.interactivity.events.onclick.mode))
-    {
-      this.bubbleParticle(particle);
-    }
-
-    if(isInArray('repulse', this.data.interactivity.events.onhover.mode) || isInArray('repulse', this.data.interactivity.events.onclick.mode))
-    {
-      this.repulseParticle(particle);
-    }
-
-    /* interaction auto between particles */
-    if(this.data.particles.line_linked.enable || this.data.particles.move.attract.enable)
-    {
-      this.data.particles.list.forEach( particle2 => {
-         /* link particles */
-        if(particle != particle2)
-        {
-          if(this.data.particles.line_linked.enable)
-          {
-            this.linkParticles(particle,particle2);
-          }
-
-          /* attract particles */
-          if(this.data.particles.move.attract.enable)
-          {
-            this.attractParticles(particle,particle2);
-          }
-
-          /* bounce particles */
-          if(this.data.particles.move.bounce)
-          {
-            this.bounceParticles(particle,particle2);
-          }
-        }
-      });
-    }
-  });
-}
 
 /*
   Parameters:
@@ -1220,6 +1316,7 @@ class Particle
   constructor(parent)
   {
     this.parent = parent;
+    this.id = this.parent.data.particles.list.length;
 
     /* size */
     this.radius = (this.parent.data.particles.size.random ? Math.random() : 1) * this.parent.data.particles.size.value;
@@ -1346,6 +1443,19 @@ class Particle
         }
       }
     }
+
+    this.parent.line_linked_Color.push({
+      p1: this,
+      links: [],
+      mouse_color: {
+        r: Math.floor(Math.random()*255),
+        g: Math.floor(Math.random()*255),
+        b: Math.floor(Math.random()*255)
+      }
+    });
+
+
+
   }
 
   static checkOverlap(p1, position)       // DONE!!
@@ -1640,7 +1750,7 @@ window.particlesJS = function(tag_id = 'particles-js', params){
 
   /* launch particle.js */
    if(canvas != null){
-    pJSDom.push(new pJS(tag_id, params));
+    pJSDom[0] = new pJS(tag_id, params);
   } 
   // **************
 };
